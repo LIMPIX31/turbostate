@@ -1,7 +1,16 @@
 # Turbostate
-######  I just needed a state machine, so I wrote this.
+
+###### I just needed a state machine, so I wrote this.
+
+## Features
+
+| feature         | description                                                          |
+|-----------------|----------------------------------------------------------------------|
+| `async`         | Async support, only `tokio`                                          |
+| `from_residual` | Short-circuit error conversion from `Result::Err` to `Flow::Failure` |
 
 ## By example
+
 ```rust
 use turbostate::{Engine, Flow, Machine};
 

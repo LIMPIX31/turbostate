@@ -3,6 +3,9 @@ resolver = "2"
 name = "turbostate"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "Simple to use Finite State Machine"
+authors = ["Danil Karpenko <limpix31@gmail.com>"]
 
 [dependencies]
 tokio = { version = "1.36", features = ["sync"], optional = true }
