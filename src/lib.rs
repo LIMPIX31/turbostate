@@ -60,7 +60,7 @@ pub trait Engine {
 	#[cfg(feature = "async")]
 	#[allow(unused)]
 	fn next(
-		state: &Self::State,
+		state: Self::State,
 		event: Self::Event,
 		shared: &mut Self::Shared,
 	) -> impl Future<Output = Flow<Self::State, Self::Error, Self::Event>> + Send {
@@ -72,7 +72,7 @@ pub trait Engine {
 	#[cfg(not(feature = "async"))]
 	#[allow(unused)]
 	fn next(
-		state: &Self::State,
+		state: Self::State,
 		event: Self::Event,
 		shared: &mut Self::Shared,
 	) -> Flow<Self::State, Self::Error, Self::Event> {
@@ -174,13 +174,13 @@ impl<T: Engine> Machine<T> {
 	where
 		T::Event: Send,
 		T::Shared: Send,
-		T::State: Send,
+		T::State: Send + Clone,
 		T::Error: Send,
 	{
 		let result = {
 			let state = self.store.state.lock().await;
 			let mut shared = self.store.shared.lock().await;
-			T::next(&state, event, &mut shared).await
+			T::next(state.clone(), event, &mut shared).await
 		};
 
 		match result {
@@ -199,11 +199,14 @@ impl<T: Engine> Machine<T> {
 
 	/// Fires the specified event on the state machine to advance the state.
 	#[cfg(not(feature = "async"))]
-	pub fn fire(&self, event: T::Event) -> Result<(), T::Error> {
+	pub fn fire(&self, event: T::Event) -> Result<(), T::Error>
+	where
+		T::State: Clone,
+	{
 		let result = {
 			let state = self.store.state.lock().unwrap();
 			let mut shared = self.store.shared.lock().unwrap();
-			T::next(&state, event, &mut shared)
+			T::next(state.clone(), event, &mut shared)
 		};
 
 		match result {
