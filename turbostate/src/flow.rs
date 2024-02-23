@@ -6,10 +6,13 @@ pub enum Flow<T, E> {
 }
 
 #[cfg(feature = "from_residual")]
-impl<T, E, V> std::ops::FromResidual<Result<T, E>> for Flow<V, E> {
+impl<T, E, V, R> std::ops::FromResidual<Result<T, E>> for Flow<V, R>
+where
+	E: Into<R>,
+{
 	fn from_residual(residual: Result<T, E>) -> Self {
 		if let Err(err) = residual {
-			Flow::Failure(err)
+			Flow::Failure(err.into())
 		} else {
 			unreachable!()
 		}
