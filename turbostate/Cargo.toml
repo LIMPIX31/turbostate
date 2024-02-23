@@ -1,0 +1,30 @@
+[package]
+resolver = "2"
+name = "turbostate"
+version = "0.1.1"
+edition = "2021"
+license = "MIT"
+description = "Simple to use Finite State Machine"
+readme = "../readme.md"
+repository = "https://github.com/LIMPIX31/turbostate/"
+documentation = "https://docs.rs/turbostate/"
+authors = ["Danil Karpenko <limpix31@gmail.com>"]
+exclude = [".editorconfig", ".rustfmt.toml"]
+categories = ["rust-patterns", "data-structures"]
+keywords = [
+	"fsm",
+	"state",
+	"state-machine",
+]
+
+[dependencies]
+turbostate_macros = { path = "../turbostate_macros" }
+tokio = { version = "1.36", features = ["sync"] }
+
+[features]
+from_residual = []
+
+[dev-dependencies]
+tokio = { version = "1.36", features = ["macros", "rt"] }
+anyhow = "1.0"
+thiserror = "1.0"
