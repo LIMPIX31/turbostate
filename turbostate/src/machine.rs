@@ -14,8 +14,7 @@ pub struct Destructed<E: Engine> {
 }
 
 impl<E: Engine> Machine<E> {
-	#[allow(dead_code)]
-	fn new(engine: E, state: E::State) -> Self {
+	pub fn new(engine: E, state: E::State) -> Self {
 		Self { engine, state }
 	}
 
@@ -42,8 +41,7 @@ impl<E: Engine> Machine<E>
 where
 	E::State: Default,
 {
-	#[allow(dead_code)]
-	fn new_default_state(engine: E) -> Self {
+	pub fn new_default_state(engine: E) -> Self {
 		Self {
 			engine,
 			state: E::State::default(),
@@ -55,8 +53,7 @@ impl<E: Engine> Machine<E>
 where
 	E: Default,
 {
-	#[allow(dead_code)]
-	fn new_default_engine(state: E::State) -> Self {
+	pub fn new_default_engine(state: E::State) -> Self {
 		Self {
 			engine: E::default(),
 			state,
