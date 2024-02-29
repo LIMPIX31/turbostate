@@ -153,15 +153,6 @@ pub fn engine(input: &mut ItemImpl, attrs: &Asyncness) -> Result<TokenStream> {
 				}
 			}
 
-			impl<E> #into_transition<#ngx::State, #ngx::Error> for ::std::result::Result<#ngx::State, E>
-			where
-				E: ::std::convert::Into<#ngx::Error>,
-			{
-				fn into_transition(self) -> ::std::result::Result<#ngx::State, #ngx::Error> {
-					self.map_err(::std::convert::Into::into)
-				}
-			}
-
 			impl #generics #engine for self::#self_ty {
 				type State = self::State;
 				type Event = self::Event;
