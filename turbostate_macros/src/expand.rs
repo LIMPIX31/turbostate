@@ -147,18 +147,9 @@ pub fn engine(input: &mut ItemImpl, attrs: &Asyncness) -> Result<TokenStream> {
 				)*
 			}
 
-			impl #into_transition<#ngx::State, #ngx::Error> for #ngx::State {
+			impl #into_transition<#ngx::State, #ngx::Error> for self::State {
 				fn into_transition(self) -> ::std::result::Result<#ngx::State, #ngx::Error> {
 					Result::Ok(self)
-				}
-			}
-
-			impl<E> #into_transition<#ngx::State, #ngx::Error> for ::std::result::Result<#ngx::State, E>
-			where
-				E: ::std::convert::Into<#ngx::Error>,
-			{
-				fn into_transition(self) -> ::std::result::Result<#ngx::State, #ngx::Error> {
-					self.map_err(::std::convert::Into::into)
 				}
 			}
 

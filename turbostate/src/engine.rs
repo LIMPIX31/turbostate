@@ -4,6 +4,12 @@ pub trait IntoTransition<T, E> {
 	fn into_transition(self) -> Result<T, E>;
 }
 
+impl<T, E, I> IntoTransition<T, I> for Result<T, E> where E: Into<I> {
+	fn into_transition(self) -> Result<T, I> {
+		self.map_err(Into::into)
+	}
+}
+
 pub trait Engine {
 	type State;
 	type Event;
