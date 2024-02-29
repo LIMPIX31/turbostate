@@ -140,8 +140,6 @@ pub fn engine(input: &mut ItemImpl, attrs: &Asyncness) -> Result<TokenStream> {
 
 	Ok(quote! {
 		const _: () = {
-			use ::std::{convert::From, result::Result, future::Future};
-
 			impl #generics self::#self_ty #generics {
 				#(
 					#[allow(clippy::wrong_self_convention)]
@@ -150,17 +148,17 @@ pub fn engine(input: &mut ItemImpl, attrs: &Asyncness) -> Result<TokenStream> {
 			}
 
 			impl #into_transition<#ngx::State, #ngx::Error> for #ngx::State {
-				fn into_transition(self) -> Result<#ngx::State, #ngx::Error> {
+				fn into_transition(self) -> ::std::result::Result<#ngx::State, #ngx::Error> {
 					Result::Ok(self)
 				}
 			}
 
-			impl<E> #into_transition<#ngx::State, #ngx::Error> for Result<#ngx::State, E>
+			impl<E> #into_transition<#ngx::State, #ngx::Error> for ::std::result::Result<#ngx::State, E>
 			where
-				E: Into<#ngx::Error>,
+				E: ::std::convert::Into<#ngx::Error>,
 			{
-				fn into_transition(self) -> Result<#ngx::State, #ngx::Error> {
-					self.map_err(Into::into)
+				fn into_transition(self) -> ::std::result::Result<#ngx::State, #ngx::Error> {
+					self.map_err(::std::convert::Into::into)
 				}
 			}
 
@@ -169,7 +167,7 @@ pub fn engine(input: &mut ItemImpl, attrs: &Asyncness) -> Result<TokenStream> {
 				type Event = self::Event;
 				type Error = self::Error;
 
-				#optional_asyncness fn next(&mut self, mut state: #selfengine::State, mut event: #selfengine::Event) -> Result<#selfengine::State, #selfengine::Error> {
+				#optional_asyncness fn next(&mut self, mut state: #selfengine::State, mut event: #selfengine::Event) -> ::std::result::Result<#selfengine::State, #selfengine::Error> {
 					let mut flow = match (state, event) {
 						#(#branch_arms)*
 					};
