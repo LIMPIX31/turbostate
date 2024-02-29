@@ -147,7 +147,7 @@ pub fn engine(input: &mut ItemImpl, attrs: &Asyncness) -> Result<TokenStream> {
 				)*
 			}
 
-			impl #into_transition<#ngx::State, #ngx::Error> for #ngx::State {
+			impl #into_transition<#ngx::State, #ngx::Error> for self::State {
 				fn into_transition(self) -> ::std::result::Result<#ngx::State, #ngx::Error> {
 					Result::Ok(self)
 				}
