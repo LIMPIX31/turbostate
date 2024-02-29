@@ -1,7 +1,7 @@
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::FnArg;
+use syn::{FnArg, ReturnType};
 use syn::ImplItem;
 use syn::ItemImpl;
 use syn::parse_quote;
@@ -41,7 +41,10 @@ impl<'ast> BranchResolver<'ast> {
 				if attr.path().is_ident("branch") {
 					let into_transition = &self.into_transition;
 					let selfengine = &self.selfengine;
-					it.sig.output = parse_quote!(-> impl #into_transition<#selfengine::State, #selfengine::Error>);
+
+					if let ret @ ReturnType::Default = &mut it.sig.output {
+						*ret = parse_quote!(-> impl #into_transition<#selfengine::State, #selfengine::Error>);
+					}
 
 					let arm = attr.parse_args()?;
 
