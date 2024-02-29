@@ -1,8 +1,8 @@
-use crate::machine::Machine;
+use crate::Engine;
+use crate::AsyncEngine;
 use anyhow::Result;
 
 mod switch {
-	use crate::Flow::*;
 	use std::convert::Infallible;
 	use turbostate_macros::engine;
 
@@ -29,30 +29,34 @@ mod switch {
 	#[engine]
 	impl Engine {
 		#[branch((A, Switch))]
-		async fn a_to_b(&mut self) {
-			Transition(B)
+		fn a_switch(&self) {
+			B
 		}
 
 		#[branch((B, Switch))]
-		async fn b_to_a(&mut self) {
-			Transition(A)
+		fn b_switch(&self) {
+			A
 		}
 	}
 }
 
 use switch::Engine as SwitchEngine;
 
-#[tokio::test]
-async fn switch() -> Result<()> {
+#[test]
+fn switch() -> Result<()> {
 	use switch::State;
 	use switch::Event;
 
-	let mut machine = Machine::<SwitchEngine>::default();
-	assert!(matches!(machine.state(), State::A));
-	machine.fire(Event::Switch).await?;
-	assert!(matches!(machine.state(), State::B));
-	machine.fire(Event::Switch).await?;
-	assert!(matches!(machine.state(), State::A));
+	let mut engine = SwitchEngine;
+	let mut state = State::default();
+	//               A -> B         B -> A         A -> B
+	let events = [Event::Switch, Event::Switch, Event::Switch];
+
+	for event in events {
+		state = engine.next(state, event)?;
+	}
+
+	assert!(matches!(state, State::B));
 
 	Ok(())
 }
@@ -94,59 +98,56 @@ mod call {
 		pub calls_received: u32,
 	}
 
-	use crate::Flow::*;
-
 	use State::*;
 	use Event::*;
 
-	#[engine]
+	#[engine(async)]
 	impl Engine {
 		#[branch((Idle, Dial))]
 		async fn idle_dial(&self) {
-			Transition(Dialing)
+			Dialing
 		}
 
 		#[branch((Dialing, Reject))]
 		async fn dialing_reject(&self) {
-			Transition(Idle)
+			Idle
 		}
 
 		#[branch((Dialing, Answer))]
 		async fn dialing_answer(&mut self) {
 			self.calls_made += 1;
-			Transition(Connected)
+			Connected
 		}
 
 		#[branch((Connected, HangUp))]
 		async fn connected_hangup(&self) {
-			Transition(Disconnected)
+			Disconnected
 		}
 
 		#[branch((Disconnected, Reset))]
 		async fn disconencted_reset(&self) {
-			Transition(Idle)
+			Idle
 		}
 
 		#[branch((Idle, IncomingCall))]
 		async fn idle_incoming_call(&self) {
-			Transition(Ringing)
+			Ringing
 		}
 
 		#[branch((Ringing, Reject))]
 		async fn ringing_reject(&self) {
-			Transition(Idle)
+			Idle
 		}
 
 		#[branch((Ringing, Answer))]
 		async fn ringing_answer(&mut self) {
 			self.calls_received += 1;
-			Transition(Connected)
+			Connected
 		}
 
 		#[branch(_)]
 		async fn rest(&self) {
-			// With `from_residual` feature enabled you can do `Err(InvalidTransition)?`
-			Failure(Error::InvalidTransition)
+			Err(Error::InvalidTransition)
 		}
 	}
 }
@@ -158,20 +159,26 @@ async fn call() -> Result<()> {
 	use call::State;
 	use call::Event;
 
-	let mut machine = Machine::<CallEngine>::default();
+	let script = [
+		Event::Dial,
+		Event::Answer,
+		Event::HangUp,
+		Event::Reset,
+		Event::IncomingCall,
+		Event::Answer,
+		Event::HangUp,
+	];
 
-	machine.fire(Event::Dial).await?;
-	machine.fire(Event::Answer).await?;
-	machine.fire(Event::HangUp).await?;
+	let mut engine = CallEngine::default();
+	let mut state = State::default();
 
-	machine.fire(Event::Reset).await?;
-	machine.fire(Event::IncomingCall).await?;
-	machine.fire(Event::Answer).await?;
-	machine.fire(Event::HangUp).await?;
+	for event in script {
+		state = engine.next(state, event).await?;
+	}
 
-	assert!(matches!(machine.state(), State::Disconnected));
-	assert_eq!(machine.engine().calls_made, 1);
-	assert_eq!(machine.engine().calls_received, 1);
+	assert!(matches!(state, State::Disconnected));
+	assert_eq!(engine.calls_made, 1);
+	assert_eq!(engine.calls_received, 1);
 
 	Ok(())
 }

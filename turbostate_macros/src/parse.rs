@@ -48,3 +48,19 @@ impl ToTokens for BranchArm {
 		}
 	}
 }
+
+pub struct Asyncness {
+	pub asyncness: Option<Token![async]>,
+}
+
+impl Parse for Asyncness {
+	fn parse(input: ParseStream) -> syn::Result<Self> {
+		Ok(if input.peek(Token![async]) {
+			Self {
+				asyncness: Some(input.parse()?),
+			}
+		} else {
+			Self { asyncness: None }
+		})
+	}
+}
