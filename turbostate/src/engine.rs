@@ -1,12 +1,21 @@
 use std::future::Future;
-use crate::Flow;
+
+pub trait IntoTransition<T, E> {
+	fn into_transition(self) -> Result<T, E>;
+}
 
 pub trait Engine {
-	type Flow;
-	type State: Clone;
+	type State;
 	type Event;
 	type Error;
 
-	#[allow(unused)]
-	fn next(&mut self, state: Self::State, event: Self::Event) -> impl Future<Output = Flow<Self::State, Self::Error>>;
+	fn next(&mut self, state: Self::State, event: Self::Event) -> Result<Self::State, Self::Error>;
+}
+
+pub trait AsyncEngine {
+	type State;
+	type Event;
+	type Error;
+
+	fn next(&mut self, state: Self::State, event: Self::Event) -> impl Future<Output = Result<Self::State, Self::Error>>;
 }

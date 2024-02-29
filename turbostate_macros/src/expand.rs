@@ -10,7 +10,7 @@ use syn::punctuated::Punctuated;
 use syn::Result;
 use syn::Token;
 
-use crate::parse::BranchArm;
+use crate::parse::{Asyncness, BranchArm};
 use crate::thiscrate::Crate;
 
 macro_rules! thiscrate {
@@ -23,24 +23,25 @@ struct Branch<'ast> {
 	ident: &'ast Ident,
 	bindings: Punctuated<&'ast Ident, Token![,]>,
 	arm: BranchArm,
+	asyncness: bool,
 }
 
-struct BranchResolver<'ast, 'a> {
-	pub thiscrate: &'a Crate,
+struct BranchResolver<'ast> {
+	pub selfengine: TokenStream,
+	pub into_transition: TokenStream,
 	pub branches: Vec<Branch<'ast>>,
-	pub pre_hooks: Vec<Ident>,
-	pub post_hooks: Vec<Ident>,
 }
 
-impl<'ast, 'a> BranchResolver<'ast, 'a> {
+impl<'ast> BranchResolver<'ast> {
 	fn visit_impl_item(&mut self, it: &'ast mut ImplItem) -> Result<()> {
 		if let ImplItem::Fn(it) = it {
 			let mut new_attrs = Vec::with_capacity(it.attrs.len());
 
 			for attr in &mut it.attrs {
 				if attr.path().is_ident("branch") {
-					let engine = thiscrate!(self.thiscrate, Engine);
-					it.sig.output = parse_quote!(-> <Self as #engine>::Flow);
+					let into_transition = &self.into_transition;
+					let selfengine = &self.selfengine;
+					it.sig.output = parse_quote!(-> impl #into_transition<#selfengine::State, #selfengine::Error>);
 
 					let arm = attr.parse_args()?;
 
@@ -56,13 +57,10 @@ impl<'ast, 'a> BranchResolver<'ast, 'a> {
 						}),
 						ident: &it.sig.ident,
 						arm,
+						asyncness: it.sig.asyncness.is_some(),
 					};
 
 					self.branches.push(branch);
-				} else if attr.path().is_ident("post") {
-					self.post_hooks.push(it.sig.ident.clone());
-				} else if attr.path().is_ident("pre") {
-					self.pre_hooks.push(it.sig.ident.clone());
 				} else {
 					new_attrs.push(attr.clone());
 				}
@@ -83,24 +81,29 @@ impl<'ast, 'a> BranchResolver<'ast, 'a> {
 	}
 }
 
-fn branches<'ast, 'a>(input: &'ast mut ItemImpl, thiscrate: &'a Crate) -> Result<BranchResolver<'ast, 'a>> {
+fn branches<'ast>(input: &'ast mut ItemImpl, engine: &TokenStream, into_transition: &TokenStream) -> Result<BranchResolver<'ast>> {
 	let mut this = BranchResolver {
 		branches: Default::default(),
-		pre_hooks: Vec::new(),
-		post_hooks: Vec::new(),
-		thiscrate,
+		selfengine: quote!(<Self as #engine>),
+		into_transition: into_transition.clone(),
 	};
 	this.visit_item_impl(input)?;
 	Ok(this)
 }
 
-pub fn engine(input: &mut ItemImpl) -> Result<TokenStream> {
+pub fn engine(input: &mut ItemImpl, attrs: &Asyncness) -> Result<TokenStream> {
 	let thiscrate = Crate::default();
 
-	let engine = thiscrate!(thiscrate, Engine);
-	let flow = thiscrate!(thiscrate, Flow);
+	let engine = if attrs.asyncness.is_some() {
+		thiscrate!(thiscrate, AsyncEngine)
+	} else {
+		thiscrate!(thiscrate, Engine)
+	};
 
-	let found_branches = branches(input, &thiscrate)?;
+	let selfengine = quote!(<Self as #engine>);
+	let into_transition = thiscrate!(thiscrate, IntoTransition);
+
+	let found_branches = branches(input, &engine, &into_transition)?;
 
 	let branch_arms: Vec<_> = {
 		found_branches.branches
@@ -110,24 +113,35 @@ pub fn engine(input: &mut ItemImpl) -> Result<TokenStream> {
 				let arm = &it.arm;
 				let bindings = &it.bindings;
 
+				let optional_dot_await = if it.asyncness {
+					quote!(.await)
+				} else {
+					quote!()
+				};
+
 				quote! {
-					#arm => self.#fn_ident(#bindings).await,
+					#arm => #into_transition::into_transition(self.#fn_ident(#bindings)#optional_dot_await)?,
 				}
 			})
 			.collect()
 	};
 
-	let pre_hooks = found_branches.pre_hooks;
-	let post_hooks = found_branches.post_hooks;
-
 	let generics = &input.generics;
 	let self_ty = &input.self_ty;
 	let items = &input.items;
 
-	let flow = quote!(#flow<<Self as #engine>::State, <Self as #engine>::Error>);
+	let ngx = quote!(<self::#self_ty as #engine>);
+
+	let optional_asyncness = if let Some(asy) = attrs.asyncness {
+		quote!(#asy)
+	} else {
+		quote!()
+	};
 
 	Ok(quote! {
 		const _: () = {
+			use ::std::{convert::From, result::Result, future::Future};
+
 			impl #generics self::#self_ty #generics {
 				#(
 					#[allow(clippy::wrong_self_convention)]
@@ -135,25 +149,32 @@ pub fn engine(input: &mut ItemImpl) -> Result<TokenStream> {
 				)*
 			}
 
+			impl #into_transition<#ngx::State, #ngx::Error> for #ngx::State {
+				fn into_transition(self) -> Result<#ngx::State, #ngx::Error> {
+					Result::Ok(self)
+				}
+			}
+
+			impl<E> #into_transition<#ngx::State, #ngx::Error> for Result<#ngx::State, E>
+			where
+				E: Into<#ngx::Error>,
+			{
+				fn into_transition(self) -> Result<#ngx::State, #ngx::Error> {
+					self.map_err(Into::into)
+				}
+			}
+
 			impl #generics #engine for self::#self_ty {
-				type Flow = #flow;
 				type State = self::State;
 				type Event = self::Event;
 				type Error = self::Error;
 
-				async fn next(&mut self, mut state: <Self as #engine>::State, mut event: <Self as #engine>::Event) -> <Self as #engine>::Flow {
-					#(match self.#pre_hooks(&mut state, &mut event).await {
-						Err(err) => return <Self as #engine>::Flow::Failure(err),
-						_ => (),
-					};)*
+				#optional_asyncness fn next(&mut self, mut state: #selfengine::State, mut event: #selfengine::Event) -> Result<#selfengine::State, #selfengine::Error> {
 					let mut flow = match (state, event) {
 						#(#branch_arms)*
 					};
-					#(match self.#post_hooks(&mut flow).await {
-						Err(err) => return <Self as #engine>::Flow::Failure(err),
-						_ => (),
-					};)*
-					flow
+
+					Ok(flow)
 				}
 			}
 		};

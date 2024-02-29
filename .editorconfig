@@ -14,7 +14,3 @@ tab_width = 2
 ij_smart_tabs = true
 ij_visual_guides = 100
 ij_wrap_on_typing = false
-
-[*.surql]
-indent_size = 2
-indent_style = space
