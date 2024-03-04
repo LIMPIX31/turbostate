@@ -123,7 +123,7 @@ pub fn engine(input: &mut ItemImpl, attrs: &Asyncness) -> Result<TokenStream> {
 				};
 
 				quote! {
-					#arm => #into_transition::into_transition(self.#fn_ident(#bindings)#optional_dot_await)?,
+					#arm => #into_transition::<#selfengine::State, #selfengine::Error>::into_transition(self.#fn_ident(#bindings)#optional_dot_await)?,
 				}
 			})
 			.collect()
