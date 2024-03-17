@@ -1,5 +1,3 @@
-#![cfg_attr(feature = "from_residual", feature(try_trait_v2))]
-
 mod engine;
 #[cfg(test)]
 mod tests;

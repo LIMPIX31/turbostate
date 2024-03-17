@@ -129,7 +129,7 @@ pub fn engine(input: &mut ItemImpl, attrs: &Asyncness) -> Result<TokenStream> {
 			.collect()
 	};
 
-	let generics = &input.generics;
+	let (impl_generics, _, where_clause) = &input.generics.split_for_impl();
 	let self_ty = &input.self_ty;
 	let items = &input.items;
 
@@ -143,20 +143,20 @@ pub fn engine(input: &mut ItemImpl, attrs: &Asyncness) -> Result<TokenStream> {
 
 	Ok(quote! {
 		const _: () = {
-			impl #generics self::#self_ty #generics {
+			impl #impl_generics self::#self_ty #where_clause {
 				#(
 					#[allow(clippy::wrong_self_convention)]
 					#items
 				)*
 			}
 
-			impl #into_transition<#ngx::State, #ngx::Error> for self::State {
+			impl #impl_generics #into_transition<#ngx::State, #ngx::Error> for self::State #where_clause {
 				fn into_transition(self) -> ::std::result::Result<#ngx::State, #ngx::Error> {
 					Result::Ok(self)
 				}
 			}
 
-			impl #generics #engine for self::#self_ty {
+			impl #impl_generics #engine for self::#self_ty #where_clause {
 				type State = self::State;
 				type Event = self::Event;
 				type Error = self::Error;
